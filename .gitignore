@@ -1,0 +1,21 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# ビルド出力
+[Bb]in/
+[Oo]bj/
+AppPackages/
+BundleArtifacts/
+*.appx
+*.msix
+*.appxbundle
+*.appxupload
+
+# 署名用証明書
+*.pfx
+
+# VS のプロジェクト変換ログ
+UpgradeLog*.htm
+_UpgradeReport_Files/

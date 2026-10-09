@@ -1,0 +1,25 @@
+﻿<Page
+    x:Class="SerialCom.SettingPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SerialCom"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid>
+        <StackPanel Orientation="Vertical">
+            <ComboBox Header="Serial Port" x:Name="cbCom" DisplayMemberPath="Name" />
+            <Rectangle Height="10"/>
+            <ComboBox Header="BaudRate" x:Name="cbBaudrate" />
+            <Rectangle Height="10"/>
+            <ComboBox Header="DataBit" x:Name="cbDatabit" />
+            <Rectangle Height="10"/>
+            <ComboBox Header="ParityBit" x:Name="cbParity" />
+            <Rectangle Height="10"/>
+            <ComboBox Header="StopBit" x:Name="cbStopbit" />
+            <Rectangle Height="30"/>
+            <Button x:Name="bOK" Content="OK" Width="100" Click="bOK_Click"/>
+        </StackPanel>
+    </Grid>
+</Page>
