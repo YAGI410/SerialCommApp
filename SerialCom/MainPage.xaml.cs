@@ -38,7 +38,12 @@ namespace SerialCom
             this.InitializeComponent();
 // これは、下流のページが MainPage インスタンスへのハンドルを取得して、このクラス内のメソッドを呼び出すことを可能にする静的パブリック プロパティです。
             Current = this;
-            this.bytes = new ObservableCollection<byte>();        }
+            this.bytes = new ObservableCollection<byte>();
+
+            // 起動時は Home を表示
+            Navi.SelectedItem = NaviHome;
+            ContentFrame.Navigate(typeof(HomePage), this);
+        }
         private void Navi_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
         {
             if (args.IsSettingsInvoked)
