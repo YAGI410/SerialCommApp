@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
 using Windows.Devices.SerialCommunication;
 using Windows.Foundation;
+using Windows.Storage.Streams;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.ApplicationModel;
@@ -44,6 +46,15 @@ namespace SerialCom
         private Boolean watcherSuspended;
         private Boolean watcherStarted;
         private Boolean isEnabledAutoReconnect;
+
+        // 受信ループ
+        private const UInt32 ReadBufferLength = 1024;
+        private CancellationTokenSource readCancellationTokenSource;
+
+        /// <summary>
+        /// データを受信したときに UI スレッドで呼ばれる
+        /// </summary>
+        public event TypedEventHandler<EventHandlerForDevice, byte[]> DataReceived;
 
         // A pointer back to the main page.  This is needed if you want to call methods in MainPage such
         // as NotifyUser()
@@ -196,6 +207,11 @@ namespace SerialCom
         /// An exception may be thrown if the device could not be opened for extraordinary reasons.</returns>
         public async Task<Boolean> OpenDeviceAsync(DeviceInformation deviceInfo)
         {
+            if (deviceSelector == null)
+            {
+                deviceSelector = SerialDevice.GetDeviceSelector();
+            }
+
             device = await SerialDevice.FromIdAsync(deviceInfo.Id);
 
             Boolean successfullyOpenedDevice = false;
@@ -208,6 +224,10 @@ namespace SerialCom
                 successfullyOpenedDevice = true;
 
                 deviceInformation = deviceInfo;
+
+                // 通信設定を反映して受信を開始（自動再接続時もここを通る）
+                StaClass.ApplyTo(device);
+                StartReadLoop(device);
 
                 notificationStatus = NotifyType.StatusMessage;
                 notificationMessage = "Device " + deviceInformation.Id + " opened";
@@ -344,6 +364,8 @@ namespace SerialCom
                     deviceCloseCallback(this, deviceInformation);
                 }
 
+                StopReadLoop();
+
                 // This closes the handle to the device
                 device.Dispose();
 
@@ -428,6 +450,66 @@ namespace SerialCom
             //deviceAccessInformation = DeviceAccessInformation.CreateFromId(deviceInformation.Id);
             //deviceAccessEventHandler = new TypedEventHandler<DeviceAccessInformation, DeviceAccessChangedEventArgs>(this.OnDeviceAccessChanged);
             //deviceAccessInformation.AccessChanged += deviceAccessEventHandler;
+        }
+
+        /// <summary>
+        /// デバイスが閉じられるまで受信を続け、届いたデータを DataReceived で通知する。
+        /// OpenDeviceAsync は UI スレッドから呼ばれるので、通知も UI スレッドで行われる。
+        /// </summary>
+        private async void StartReadLoop(SerialDevice serialDevice)
+        {
+            StopReadLoop();
+            readCancellationTokenSource = new CancellationTokenSource();
+            var cancellationToken = readCancellationTokenSource.Token;
+
+            var reader = new DataReader(serialDevice.InputStream);
+            reader.InputStreamOptions = InputStreamOptions.Partial;
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    UInt32 bytesRead = await reader.LoadAsync(ReadBufferLength).AsTask(cancellationToken);
+                    if (bytesRead > 0)
+                    {
+                        var buffer = new byte[bytesRead];
+                        reader.ReadBytes(buffer);
+                        DataReceived?.Invoke(this, buffer);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // 切断時のキャンセル
+            }
+            catch (Exception exception)
+            {
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    MainPage.Current.NotifyUser("Read error: " + exception.Message, NotifyType.ErrorMessage);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    reader.DetachStream();
+                }
+                catch (Exception)
+                {
+                    // デバイスが既に閉じられている
+                }
+                reader.Dispose();
+            }
+        }
+
+        private void StopReadLoop()
+        {
+            if (readCancellationTokenSource != null)
+            {
+                readCancellationTokenSource.Cancel();
+                readCancellationTokenSource.Dispose();
+                readCancellationTokenSource = null;
+            }
         }
 
         private void UnregisterFromDeviceAccessStatusChange()

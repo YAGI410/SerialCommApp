@@ -7,6 +7,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
+    NavigationCacheMode="Required"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
     <Grid>
         <Grid.RowDefinitions>
@@ -18,7 +19,7 @@
             <Rectangle Width="15"/>
             <Button x:Name="bConnect" Content="Connect" Click="bConnect_Click"/>
             <Rectangle Width="15"/>
-            <Button x:Name="bDisconnect" Content="Disconnect"/>
+            <Button x:Name="bDisconnect" Content="Disconnect" Click="bDisconnect_Click" IsEnabled="False"/>
             <Rectangle Width="45"/>
             <TextBlock x:Uid="Port" Text="Port:"/>
             <TextBlock x:Name="tbPort" Text=""/>
@@ -103,18 +104,26 @@
         </Grid>
         <Grid Margin="5" Grid.Row="2" BorderBrush="Orange" BorderThickness="2">
             <StackPanel Orientation="Vertical" VerticalAlignment="Bottom">
-                <TextBlock x:Uid="ReciveTxt" Text="Recive"/>
-                <controls:DataGrid x:Name="dataGrid2">
-                    <controls:DataGrid.Columns>
-                        <controls:DataGridTextColumn Header="01"/>
-                        <controls:DataGridTextColumn Header="02"/>
-                        <controls:DataGridTextColumn Header="03"/>
-                        <controls:DataGridTextColumn Header="04"/>
-                    </controls:DataGrid.Columns>
-                </controls:DataGrid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="200"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Uid="ReciveTxt" Text="Recive"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock x:Name="tbRBytes" Text="0"/>
+                        <Rectangle Width="5"/>
+                        <TextBlock Text="Byte"/>
+                        <Button x:Name="bRClear" Content="Clear" Width="100" Click="bRClear_Click"/>
+                    </StackPanel>
+                </Grid>
+                <!-- 最後に受信したフレーム（受信間隔が空いたら次のフレームとみなす） -->
+                <controls:DataGrid x:Name="dataGrid2" HeadersVisibility="Column" AutoGenerateColumns="False"/>
                 <Rectangle Height="10"/>
                 <Grid Height="100">
-                    <TextBox Grid.Column="0" AcceptsReturn="True"/>
+                    <!-- 送受信ログ（新しいものが上） -->
+                    <TextBox x:Name="tbLog" Grid.Column="0" AcceptsReturn="True" IsReadOnly="True" FontFamily="Consolas"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                 </Grid>
                 <TextBlock x:Name="rDate" Text="----/--/-- --:--:--" Margin="10,10,0,10"/>
             </StackPanel>

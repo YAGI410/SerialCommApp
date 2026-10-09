@@ -35,13 +35,18 @@ namespace SerialCom
     /// </summary>
     public sealed partial class HomePage : Page
     {
-        private const String ButtonNameDisconnectFromDevice = "Disconnect from device";
+        private const String ButtonNameDisconnect = "Disconnect";
         private const String ButtonNameDisableReconnectToDevice = "Do not automatically reconnect to device that was just closed";
+
+        // 受信表示
+        private static readonly TimeSpan FrameGap = TimeSpan.FromMilliseconds(200);
+        private const int MaxLogLength = 100000;
+        private readonly List<byte> _rFrame = new List<byte>();
+        private DateTime _lastReceived = DateTime.MinValue;
 
         private ObservableCollection<ObservableCollection<byte>> _bytes;
         private ObservableCollection<bytesRow> _rows;
 
-        private Boolean isAllDevicesEnumerated;
         private Boolean IsWriteTaskPending;
         DataWriter DataWriteObject = null;
 
@@ -72,7 +77,7 @@ namespace SerialCom
             DataGridRefresh();
 
             this.tbDatabit.Text = StaClass.Databit.ToString();
-            this.tbPort.Text = StaClass.MySerial != null ? StaClass.MySerial.PortName : "-";
+            this.tbPort.Text = StaClass.SerialDevInfomation != null ? StaClass.SerialDevInfomation.Name : "-";
             this.tbStopbit.Text = StaClass.Stopbit.ToString();
             this.tbParity.Text = StaClass.Parity.ToString();
             this.tbBaudrate.Text = StaClass.BaudRate.ToString();
@@ -116,14 +121,24 @@ namespace SerialCom
         /// </summary>
         private void DataGridRefresh()
         {
-            this.dataGrid1.Columns.Clear();
-            this.dataGrid1.ItemsSource = null;
+            _rows = FillByteGrid(this.dataGrid1, _bytes[0]);
+            this.tbSending.Text = "";
+            this.tbBytes.Text = _bytes[0].Count.ToString();
+        }
+
+        /// <summary>
+        /// 1バイト1列で DataGrid に表示する（ヘッダーは ASCII、セルは 16進）
+        /// </summary>
+        private static ObservableCollection<bytesRow> FillByteGrid(DataGrid grid, IEnumerable<byte> data)
+        {
+            grid.Columns.Clear();
+            grid.ItemsSource = null;
 
             var i = 1;
-            _rows = new ObservableCollection<bytesRow>();
+            var rows = new ObservableCollection<bytesRow>();
             var newRow1 = new bytesRow();
 
-            foreach (var item in _bytes[0])
+            foreach (var item in data)
             {
                 DataGridTextColumn column1 = new DataGridTextColumn();
 
@@ -132,18 +147,15 @@ namespace SerialCom
 
                 newRow1.Bytes.Add("0x" + item.ToString("X2"));
                 column1.Binding = new Binding();
-                var b = new Binding();
-                b.Source = newRow1.Bytes;
                 column1.Binding.Source = newRow1.Bytes[i - 1];
                 column1.Binding.Mode = BindingMode.TwoWay;
-                dataGrid1.Columns.Add(column1);
+                grid.Columns.Add(column1);
 
                 i++;
             }
-            _rows.Add(newRow1);
-            this.dataGrid1.ItemsSource = _rows;
-            this.tbSending.Text = "";
-            this.tbBytes.Text = _bytes[0].Count.ToString();
+            rows.Add(newRow1);
+            grid.ItemsSource = rows;
+            return rows;
         }
 
         private async void b1Send_Click(object sender, RoutedEventArgs e)
@@ -210,24 +222,97 @@ namespace SerialCom
         }
         private async void bConnect_Click(object sender, RoutedEventArgs e)
         {
-            if (StaClass.MySerial != null)
-                {
-                    // Create an EventHandlerForDevice to watch for the device we are connecting to
-                    // シングルトンクラス
-                    EventHandlerForDevice.CreateNewEventHandlerForDevice();
+            if (StaClass.SerialDevInfomation == null)
+            {
+                _mainPage.NotifyUser("Setting でポートを選択してください", NotifyType.ErrorMessage);
+                return;
+            }
 
-                // Get notified when the device was successfully connected to or about to be closed
-                // デバイスが正常に接続されたとき、または閉じられようとしているときに通知を受け取ります
-                EventHandlerForDevice.Current.OnDeviceConnected = OnDeviceConnected;
-                    EventHandlerForDevice.Current.OnDeviceClose = OnDeviceClosing;
+            // Create an EventHandlerForDevice to watch for the device we are connecting to
+            // シングルトンクラス
+            EventHandlerForDevice.CreateNewEventHandlerForDevice();
 
-                    // It is important that the FromIdAsync call is made on the UI thread because the consent prompt, when present,
-                    // can only be displayed on the UI thread. Since this method is invoked by the UI, we are already in the UI thread.
-                    Boolean openSuccess = await EventHandlerForDevice.Current.OpenDeviceAsync(StaClass.SerialDevInfomation);
+            // Get notified when the device was successfully connected to or about to be closed
+            // デバイスが正常に接続されたとき、または閉じられようとしているときに通知を受け取ります
+            EventHandlerForDevice.Current.OnDeviceConnected = OnDeviceConnected;
+            EventHandlerForDevice.Current.OnDeviceClose = OnDeviceClosing;
+            EventHandlerForDevice.Current.DataReceived += OnDataReceived;
 
-                    // Disable connect button if we connected to the device
-                    UpdateConnectDisconnectButtonsAndList(!openSuccess);
-                }
+            try
+            {
+                // It is important that the FromIdAsync call is made on the UI thread because the consent prompt, when present,
+                // can only be displayed on the UI thread. Since this method is invoked by the UI, we are already in the UI thread.
+                Boolean openSuccess = await EventHandlerForDevice.Current.OpenDeviceAsync(StaClass.SerialDevInfomation);
+
+                // Disable connect button if we connected to the device
+                UpdateConnectDisconnectButtonsAndList(!openSuccess);
+            }
+            catch (Exception exception)
+            {
+                _mainPage.NotifyUser(exception.Message, NotifyType.ErrorMessage);
+            }
+        }
+
+        private void bDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            var handler = EventHandlerForDevice.Current;
+            if ((String)bDisconnect.Content == ButtonNameDisableReconnectToDevice)
+            {
+                // 抜かれたデバイスの自動再接続をやめる
+                handler.IsEnabledAutoReconnect = false;
+            }
+
+            // 手動切断なので「再接続しない」表示への切り替えは不要
+            handler.OnDeviceClose = null;
+            handler.DataReceived -= OnDataReceived;
+            handler.CloseDevice();
+
+            bDisconnect.Content = ButtonNameDisconnect;
+            UpdateConnectDisconnectButtonsAndList(true);
+        }
+
+        /// <summary>
+        /// 受信データを表示する。受信間隔が FrameGap 以上空いたら新しいフレームとして扱う。
+        /// </summary>
+        private void OnDataReceived(EventHandlerForDevice sender, byte[] data)
+        {
+            var now = DateTime.Now;
+            if (now - _lastReceived > FrameGap)
+            {
+                _rFrame.Clear();
+            }
+            _lastReceived = now;
+            _rFrame.AddRange(data);
+
+            FillByteGrid(this.dataGrid2, _rFrame);
+            this.tbRBytes.Text = _rFrame.Count.ToString();
+            rDate.Text = now.ToString("yyyy/MM/dd HH:mm:ss");
+            AppendLog("RX", data);
+        }
+
+        private void bRClear_Click(object sender, RoutedEventArgs e)
+        {
+            _rFrame.Clear();
+            FillByteGrid(this.dataGrid2, _rFrame);
+            this.tbRBytes.Text = "0";
+            tbLog.Text = "";
+        }
+
+        /// <summary>
+        /// 送受信ログに 1 行追加（新しいものが上）
+        /// </summary>
+        private void AppendLog(string direction, byte[] data)
+        {
+            var hex = String.Join(" ", data.Select(b => b.ToString("X2")));
+            var ascii = new String(data.Select(b => b >= 0x20 && b < 0x7F ? (char)b : '.').ToArray());
+            var line = DateTime.Now.ToString("HH:mm:ss.fff") + " " + direction + " " + hex + "  |" + ascii + "|";
+
+            var text = line + "\r" + tbLog.Text;
+            if (text.Length > MaxLogLength)
+            {
+                text = text.Substring(0, MaxLogLength);
+            }
+            tbLog.Text = text;
         }
         /// <summary>
         /// すべてのデバイスが列挙されている場合は、接続したリスト内のデバイスを選択します。
@@ -237,11 +322,8 @@ namespace SerialCom
         /// <param name="deviceInformation"></param>
         private void OnDeviceConnected(EventHandlerForDevice sender, DeviceInformation deviceInformation)
         {
-            // Find and select our connected device
-            if (isAllDevicesEnumerated)
-            {
-               bDisconnect.Content = ButtonNameDisconnectFromDevice;
-            }
+            bDisconnect.Content = ButtonNameDisconnect;
+            UpdateConnectDisconnectButtonsAndList(false);
 
             if (EventHandlerForDevice.Current.Device.PortName != "")
             {
@@ -292,7 +374,8 @@ namespace SerialCom
 
             if (_bytes[0].Count != 0)
             {
-                DataWriteObject.WriteBytes(_bytes[0].ToArray());
+                var sendBytes = _bytes[0].ToArray();
+                DataWriteObject.WriteBytes(sendBytes);
 
                 // Don't start any IO if we canceled the task
                 lock (WriteCancelLock)
@@ -306,6 +389,7 @@ namespace SerialCom
 
                 UInt32 bytesWritten = await storeAsyncTask;
                 sDate.Text = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
+                AppendLog("TX", sendBytes);
                 _mainPage.NotifyUser("Write completed - " + bytesWritten.ToString() + " bytes written", NotifyType.StatusMessage);
             }
             else

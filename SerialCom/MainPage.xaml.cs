@@ -48,37 +48,12 @@ namespace SerialCom
             else if (args.InvokedItemContainer != null)
             {
                 Type navPageType = Type.GetType(args.InvokedItemContainer.Tag.ToString());
-                ContentFrame.Navigate(navPageType,this);
-            }
-        }
-
-        public void SerialPort()
-        {
-            try
-            {
-                if (StaClass.MySerial != null)
+                if (navPageType == null)
                 {
-                    // Found a valid serial device.
-
-                    // Reading a byte from the serial device.
-                    //DataReader dr = new DataReader(StaClass.MySerial.InputStream);
-                    //int readByte = dr.ReadByte();
-
-                    // Writing a byte to the serial device.
-                    DataWriter dw = new DataWriter(StaClass.MySerial.OutputStream);
-                    var SendBytes = new byte[bytes.Count];
-                    var i = 0;
-                    foreach (var item in bytes)
-                    {
-                        SendBytes[i] = item;
-                        i++;
-                    }
-                    dw.WriteBytes(SendBytes);
+                    NotifyUser("このページは未実装です", NotifyType.ErrorMessage);
+                    return;
                 }
-            }
-            catch (Exception)
-            {
-                // Couldn't instantiate the device
+                ContentFrame.Navigate(navPageType,this);
             }
         }
         /// <summary>

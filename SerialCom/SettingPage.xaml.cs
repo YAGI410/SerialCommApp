@@ -52,23 +52,48 @@ namespace SerialCom
             cbDatabit.ItemsSource = StaClass.Databits;
             cbStopbit.ItemsSource= StaClass.Stopbits;
 
-            //
-            cbCom.SelectedItem = StaClass.MySerial;
+            // 現在の設定を選択状態にする
+            cbCom.SelectedItem = devices.FirstOrDefault(d => d.Id == StaClass.SerialDevInfomation?.Id);
             cbBaudrate.SelectedItem = StaClass.BaudRate;
             cbParity.SelectedItem = StaClass.Parity;
             cbDatabit.SelectedItem = StaClass.Databit;
             cbStopbit.SelectedItem = StaClass.Stopbit;
         }
 
-        private async void bOK_Click(object sender, RoutedEventArgs e)
+        private void bOK_Click(object sender, RoutedEventArgs e)
         {
+            if (cbCom.SelectedItem == null || cbBaudrate.SelectedItem == null || cbDatabit.SelectedItem == null
+                || cbParity.SelectedItem == null || cbStopbit.SelectedItem == null)
+            {
+                MainPage.Current.NotifyUser("未選択の項目があります", NotifyType.ErrorMessage);
+                return;
+            }
+
             StaClass.BaudRate = (int)cbBaudrate.SelectedItem;
             StaClass.Databit = (int)cbDatabit.SelectedItem;
-            StaClass.Parity = (int)cbParity.SelectedItem;
-            StaClass.Stopbit = (int)cbStopbit.SelectedItem;
-            StaClass.SerialDevInfomation = (DeviceInformation)cbCom.SelectedItem;
-            var newSerial = await SerialDevice.FromIdAsync(StaClass.SerialDevInfomation.Id);
-            StaClass.MySerial = newSerial;
+            StaClass.Parity = (SerialParity)cbParity.SelectedItem;
+            StaClass.Stopbit = (SerialStopBitCount)cbStopbit.SelectedItem;
+
+            // ポートはここでは開かない（Home の Connect で開く）
+            var newDevInfo = (DeviceInformation)cbCom.SelectedItem;
+            var portChanged = StaClass.SerialDevInfomation?.Id != newDevInfo.Id;
+            StaClass.SerialDevInfomation = newDevInfo;
+
+            var handler = EventHandlerForDevice.Current;
+            if (handler.IsDeviceConnected && !portChanged)
+            {
+                // 接続中なら通信設定をその場で反映
+                StaClass.ApplyTo(handler.Device);
+                MainPage.Current.NotifyUser("設定を保存し、接続中のポートに反映しました", NotifyType.StatusMessage);
+            }
+            else if (handler.IsDeviceConnected)
+            {
+                MainPage.Current.NotifyUser("設定を保存しました。ポートの変更は Disconnect → Connect で反映されます", NotifyType.StatusMessage);
+            }
+            else
+            {
+                MainPage.Current.NotifyUser("設定を保存しました", NotifyType.StatusMessage);
+            }
         }
     }
 }
