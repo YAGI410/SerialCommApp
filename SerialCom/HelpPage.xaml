@@ -1,0 +1,65 @@
+<Page
+    x:Class="SerialCom.HelpPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SerialCom"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Page.Resources>
+        <Style x:Key="HelpTitle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
+            <Setter Property="Margin" Value="0,20,0,6"/>
+        </Style>
+        <Style x:Key="HelpBody" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="10,2,0,2"/>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="10,0,20,20" MaxWidth="900" HorizontalAlignment="Left">
+            <TextBlock Text="操作方法" Style="{StaticResource TitleTextBlockStyle}"/>
+
+            <!-- 基本の流れ -->
+            <TextBlock Text="基本の流れ" Style="{StaticResource HelpTitle}"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="1. 左下の歯車（Settings）で COM ポートと通信条件を選び、OK を押す"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="2. Home または Modbus 画面で Connect を押してポートを開く"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="3. 送信データを用意して送信し、受信欄で応答を確認する"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="4. 終わったら Disconnect でポートを閉じる"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="画面下の Status 欄に、操作の結果やエラーが表示されます。"/>
+
+            <!-- Settings -->
+            <TextBlock Text="Settings（通信設定）" Style="{StaticResource HelpTitle}"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="Serial Port / BaudRate / DataBit / ParityBit / StopBit を選んで OK を押すと保存されます。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="接続中に通信条件だけを変えた場合は、その場で反映されます。ポートを変えた場合は Disconnect → Connect で反映されます。"/>
+
+            <!-- Home -->
+            <TextBlock Text="Home（汎用の送受信）" Style="{StaticResource HelpTitle}"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・ASC：上の入力欄の文字列を ASCII として送信データの末尾に追加します。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・HEX：左の小さな欄に 16 進 1 バイト（例 02、1B）を入れて押すと、そのバイトを追加します。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・End Code：送信時に末尾へ付ける終端（なし / CR LF / CR）を選びます。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・送信データは 1 バイト 1 列で表示されます（ヘッダーは ASCII、値は 16 進）。Clear で送信データを消去します。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・1 Send：送信データを 1 回送信します。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・連続送信：回数（0 = 無制限）と間隔を決めて Start、Stop で止めます。送信中に送信データを変えると、次の送信から反映されます。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・受信したデータは Recive 欄とログに表示されます。受信側の Clear で表示を消去します。"/>
+
+            <!-- Modbus -->
+            <TextBlock Text="Modbus（Modbus RTU の通信チェック）" Style="{StaticResource HelpTitle}"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="保持レジスタ（FC 03）または入力レジスタ（FC 04）を読み出して、配線や設定が正しいかを確認します。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・局番 / 個数 / タイムアウト：数値を入力するか、横の ▲▼ で増減します。範囲外の値は上限・下限に丸められます。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・開始アドレス：0 始まりの 10 進で入力します。0x を付けると 16 進（例 0x0100）で入力できます。機器の資料が 40001 のような 1 始まりの番号の場合は、そこから 40001 を引いた値を入れます。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・入力内容から作った要求フレーム（CRC 付き）が表に表示されます。列ヘッダーは各バイトの意味です。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・1 Send：1 回だけ問い合わせます。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・連続ポーリング：回数（0 = 無制限）と間隔を決めて Start、Stop で止めます。開始すると統計がリセットされます。"/>
+
+            <TextBlock Text="Modbus の結果の見方" Style="{StaticResource HelpTitle}"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・正常応答：読み出し値欄に、アドレスごとの値（16 進 / 符号なし / 符号付き）が表示されます。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・応答なし：配線、ポート、局番、ボーレートなどの通信条件を確認してください。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・送信エコーのみ：自分の送信だけが戻っています。相手機器が応答していません。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・CRC エラー / 途中で途切れた：ノイズや通信条件（パリティ、ストップビット）の違いが考えられます。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="・例外応答：通信自体は正常です。アドレスや個数が相手機器で使えるか確認してください。"/>
+            <TextBlock Style="{StaticResource HelpBody}" Text="結果の下にヒントが表示されます。統計欄では送信回数・エラー率・応答時間を確認できます。ログは新しいものが上に表示されます。"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

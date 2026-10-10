@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:Microsoft.Toolkit.Uwp.UI.Controls"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     xmlns:local="using:SerialCom"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -98,7 +99,19 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="b1Send" x:Uid="bSend" Content="1 Send" VerticalAlignment="Bottom" Click="b1Send_Click"/>
                     <Rectangle Width="50"/>
-                    <ToggleSwitch x:Uid="tbBat" Header="Batch"/>
+                    <!-- 連続送信 -->
+                    <StackPanel Orientation="Horizontal" BorderBrush="PaleGreen" BorderThickness="2" Padding="5">
+                        <muxc:NumberBox x:Name="nbPollCount" Header="回数 (0=無制限)" Value="100" Minimum="0" Maximum="1000000"
+                                        SmallChange="10" LargeChange="100" SpinButtonPlacementMode="Inline" Width="140"/>
+                        <Rectangle Width="10"/>
+                        <muxc:NumberBox x:Name="nbPollInterval" Header="間隔 (ms)" Value="500" Minimum="0" Maximum="60000"
+                                        SmallChange="50" LargeChange="500" SpinButtonPlacementMode="Inline" Width="130"/>
+                        <Rectangle Width="10"/>
+                        <Button x:Name="bPollStart" Content="Start" Width="80" VerticalAlignment="Bottom" Click="bPollStart_Click"/>
+                        <Rectangle Width="10"/>
+                        <Button x:Name="bPollStop" Content="Stop" Width="80" VerticalAlignment="Bottom" Click="bPollStop_Click" IsEnabled="False"/>
+                    </StackPanel>
+                    <Rectangle Width="5"/>
                 </StackPanel>
             </Grid>
         </Grid>

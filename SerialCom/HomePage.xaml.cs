@@ -48,6 +48,7 @@ namespace SerialCom
         private ObservableCollection<bytesRow> _rows;
 
         private Boolean IsWriteTaskPending;
+        private Boolean _isPolling;
         DataWriter DataWriteObject = null;
 
         // 書き込みキャンセル用
@@ -56,6 +57,7 @@ namespace SerialCom
 
 
 
+        private EventHandlerForDevice _handler;
         private MainPage _mainPage;
         public HomePage()
         {
@@ -81,6 +83,37 @@ namespace SerialCom
             this.tbStopbit.Text = StaClass.Stopbit.ToString();
             this.tbParity.Text = StaClass.Parity.ToString();
             this.tbBaudrate.Text = StaClass.BaudRate.ToString();
+
+            // Modbus 画面で接続・切断されている場合があるので、現在のデバイスに合わせる
+            AttachHandler();
+            UpdateConnectDisconnectButtonsAndList(!EventHandlerForDevice.Current.IsDeviceConnected);
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            CancelWrite();
+            DetachHandler();
+        }
+
+        /// <summary>
+        /// 現在のデバイスの受信・接続通知をこのページで受け取る
+        /// </summary>
+        private void AttachHandler()
+        {
+            DetachHandler();
+            _handler = EventHandlerForDevice.Current;
+            _handler.DataReceived += OnDataReceived;
+            _handler.OnDeviceConnected = OnDeviceConnected;
+            _handler.OnDeviceClose = OnDeviceClosing;
+        }
+
+        private void DetachHandler()
+        {
+            if (_handler != null)
+            {
+                _handler.DataReceived -= OnDataReceived;
+                _handler = null;
+            }
         }
 
         private void bText_Click(object sender, RoutedEventArgs e)
@@ -162,8 +195,9 @@ namespace SerialCom
 
         /// <summary>
         /// 1バイト1列で DataGrid に表示する（ヘッダーは ASCII、セルは 16進）
+        /// headers を渡すと、その文字列をヘッダーにする（足りない列は ASCII）
         /// </summary>
-        private static ObservableCollection<bytesRow> FillByteGrid(DataGrid grid, IEnumerable<byte> data)
+        internal static ObservableCollection<bytesRow> FillByteGrid(DataGrid grid, IEnumerable<byte> data, IList<String> headers = null)
         {
             grid.Columns.Clear();
             grid.ItemsSource = null;
@@ -177,7 +211,9 @@ namespace SerialCom
                 DataGridTextColumn column1 = new DataGridTextColumn();
 
                 var bytearray1 = new byte[] { item, };
-                column1.Header = Encoding.ASCII.GetString(bytearray1); // 列1のヘッダー
+                column1.Header = headers != null && i - 1 < headers.Count
+                    ? headers[i - 1]
+                    : Encoding.ASCII.GetString(bytearray1); // 列1のヘッダー
 
                 newRow1.Bytes.Add("0x" + item.ToString("X2"));
                 column1.Binding = new Binding();
@@ -194,46 +230,144 @@ namespace SerialCom
 
         private async void b1Send_Click(object sender, RoutedEventArgs e)
         {
-            if (EventHandlerForDevice.Current != null && EventHandlerForDevice.Current.IsDeviceConnected)
+            if (!CheckConnected()) return;
+            try
             {
-                try
-                {
-                    _mainPage.NotifyUser("Writing...", NotifyType.StatusMessage);
+                _mainPage.NotifyUser("Writing...", NotifyType.StatusMessage);
 
-                    // 書き込み完了まで送信ボタンを無効にする
-                    IsWriteTaskPending = true;
-                    WriteCancellationTokenSource = new CancellationTokenSource();
-                    DataWriteObject = new DataWriter(EventHandlerForDevice.Current.Device.OutputStream);
-                    UpdateWriteButtonStates();
+                // 書き込み完了まで送信ボタンを無効にする
+                BeginWrite(false);
+                await SendOnceAsync(WriteCancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException /*exception*/)
+            {
+                NotifyWriteTaskCanceled();
+            }
+            catch (Exception exception)
+            {
+                _mainPage.NotifyUser(exception.Message.ToString(), NotifyType.ErrorMessage);
+                Debug.WriteLine(exception.Message.ToString());
+            }
+            finally
+            {
+                EndWrite();
+            }
+        }
 
-                    await WriteAsync(WriteCancellationTokenSource.Token);
-                }
-                catch (OperationCanceledException /*exception*/)
+        /// <summary>
+        /// 送信データを回数・間隔を決めて繰り返し送信する
+        /// </summary>
+        private async void bPollStart_Click(object sender, RoutedEventArgs e)
+        {
+            if (!CheckConnected()) return;
+            if (BuildSendBytes().Length == 0)
+            {
+                _mainPage.NotifyUser("送信データがありません", NotifyType.ErrorMessage);
+                return;
+            }
+            int count, interval;
+            if (!ModbusPage.TryGetNumber(nbPollCount, out count))
+            {
+                _mainPage.NotifyUser("回数は 0～1000000 で入力してください", NotifyType.ErrorMessage);
+                return;
+            }
+            if (!ModbusPage.TryGetNumber(nbPollInterval, out interval))
+            {
+                _mainPage.NotifyUser("間隔は 0～60000 ms で入力してください", NotifyType.ErrorMessage);
+                return;
+            }
+
+            BeginWrite(true);
+            var token = WriteCancellationTokenSource.Token;
+            int sent = 0;
+            bool failed = false;
+            try
+            {
+                for (int i = 0; count == 0 || i < count; i++)
                 {
-                    NotifyWriteTaskCanceled();
-                }
-                catch (Exception exception)
-                {
-                    _mainPage.NotifyUser(exception.Message.ToString(), NotifyType.ErrorMessage);
-                    Debug.WriteLine(exception.Message.ToString());
-                }
-                finally
-                {
-                    IsWriteTaskPending = false;
-                    if (DataWriteObject != null)
+                    if (token.IsCancellationRequested || !EventHandlerForDevice.Current.IsDeviceConnected) break;
+                    await SendOnceAsync(token);
+                    sent++;
+                    _mainPage.NotifyUser("Sending... " + sent + (count == 0 ? "" : " / " + count), NotifyType.StatusMessage);
+                    if (count == 0 || i + 1 < count)
                     {
-                        DataWriteObject.DetachStream();
-                        DataWriteObject = null;
+                        await Task.Delay(interval, token);
                     }
-                    WriteCancellationTokenSource?.Dispose();
-                    WriteCancellationTokenSource = null;
-
-                    UpdateWriteButtonStates();
                 }
             }
-            else
+            catch (OperationCanceledException)
             {
-                _mainPage.NotifyUser("Device is not connected", NotifyType.ErrorMessage);
+                // Stop ボタン・切断・画面移動
+            }
+            catch (Exception exception)
+            {
+                failed = true;
+                _mainPage.NotifyUser(exception.Message, NotifyType.ErrorMessage);
+            }
+            finally
+            {
+                EndWrite();
+                if (!failed)
+                {
+                    _mainPage.NotifyUser("Sending finished - 送信 " + sent + " 回", NotifyType.StatusMessage);
+                }
+            }
+        }
+
+        private void bPollStop_Click(object sender, RoutedEventArgs e)
+        {
+            CancelWrite();
+        }
+
+        private bool CheckConnected()
+        {
+            if (EventHandlerForDevice.Current != null && EventHandlerForDevice.Current.IsDeviceConnected) return true;
+            _mainPage.NotifyUser("Device is not connected", NotifyType.ErrorMessage);
+            return false;
+        }
+
+        private void BeginWrite(bool polling)
+        {
+            IsWriteTaskPending = true;
+            _isPolling = polling;
+            WriteCancellationTokenSource = new CancellationTokenSource();
+            UpdateWriteButtonStates();
+        }
+
+        private void EndWrite()
+        {
+            IsWriteTaskPending = false;
+            _isPolling = false;
+            WriteCancellationTokenSource?.Dispose();
+            WriteCancellationTokenSource = null;
+            UpdateWriteButtonStates();
+        }
+
+        /// <summary>
+        /// 送信中・連続送信中なら止める（Stop ボタン・切断・画面移動）
+        /// </summary>
+        private void CancelWrite()
+        {
+            lock (WriteCancelLock)
+            {
+                WriteCancellationTokenSource?.Cancel();
+            }
+        }
+
+        /// <summary>
+        /// 送信データを 1 回送る
+        /// </summary>
+        private async Task SendOnceAsync(CancellationToken cancellationToken)
+        {
+            DataWriteObject = new DataWriter(EventHandlerForDevice.Current.Device.OutputStream);
+            try
+            {
+                await WriteAsync(cancellationToken);
+            }
+            finally
+            {
+                DataWriteObject.DetachStream();
+                DataWriteObject = null;
             }
         }
 
@@ -243,6 +377,8 @@ namespace SerialCom
         private void UpdateWriteButtonStates()
         {
             b1Send.IsEnabled = !IsPerformingWrite();
+            bPollStart.IsEnabled = !IsPerformingWrite();
+            bPollStop.IsEnabled = IsPerformingWrite() && _isPolling;
         }
 
         private void NotifyWriteTaskCanceled()
@@ -266,11 +402,8 @@ namespace SerialCom
             // シングルトンクラス
             EventHandlerForDevice.CreateNewEventHandlerForDevice();
 
-            // Get notified when the device was successfully connected to or about to be closed
             // デバイスが正常に接続されたとき、または閉じられようとしているときに通知を受け取ります
-            EventHandlerForDevice.Current.OnDeviceConnected = OnDeviceConnected;
-            EventHandlerForDevice.Current.OnDeviceClose = OnDeviceClosing;
-            EventHandlerForDevice.Current.DataReceived += OnDataReceived;
+            AttachHandler();
 
             try
             {
@@ -289,6 +422,8 @@ namespace SerialCom
 
         private void bDisconnect_Click(object sender, RoutedEventArgs e)
         {
+            CancelWrite();
+
             var handler = EventHandlerForDevice.Current;
             if ((String)bDisconnect.Content == ButtonNameDisableReconnectToDevice)
             {
@@ -298,7 +433,6 @@ namespace SerialCom
 
             // 手動切断なので「再接続しない」表示への切り替えは不要
             handler.OnDeviceClose = null;
-            handler.DataReceived -= OnDataReceived;
             handler.CloseDevice();
 
             bDisconnect.Content = ButtonNameDisconnect;
@@ -386,6 +520,7 @@ namespace SerialCom
                 {
                     // We were connected to the device that was unplugged, so change the "Disconnect from device" button
                     // to "Do not reconnect to device"
+                    CancelWrite();
                     if (bDisconnect.IsEnabled && EventHandlerForDevice.Current.IsEnabledAutoReconnect)
                     {
                         bDisconnect.Content = ButtonNameDisableReconnectToDevice;

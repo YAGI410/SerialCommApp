@@ -74,7 +74,7 @@ namespace SerialCom
             StaClass.Parity = (SerialParity)cbParity.SelectedItem;
             StaClass.Stopbit = (SerialStopBitCount)cbStopbit.SelectedItem;
 
-            // ポートはここでは開かない（Home の Connect で開く）
+            // ポートはここでは開かない（Home / Modbus の Connect で開く）
             var newDevInfo = (DeviceInformation)cbCom.SelectedItem;
             var portChanged = StaClass.SerialDevInfomation?.Id != newDevInfo.Id;
             StaClass.SerialDevInfomation = newDevInfo;

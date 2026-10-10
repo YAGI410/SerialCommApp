@@ -20,12 +20,12 @@
                         <FontIcon Glyph="&#xE10F;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Modbus" Tag="SerialCom.HomePage">
+                <NavigationViewItem Content="Modbus" Tag="SerialCom.ModbusPage">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE957;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Help" Tag="PLCEventLog.HelpPage" >
+                <NavigationViewItem Content="Help" Tag="SerialCom.HelpPage">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE897;"/>
                     </NavigationViewItem.Icon>
