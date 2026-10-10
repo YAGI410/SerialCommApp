@@ -121,9 +121,43 @@ namespace SerialCom
         /// </summary>
         private void DataGridRefresh()
         {
-            _rows = FillByteGrid(this.dataGrid1, _bytes[0]);
+            SendViewRefresh();
             this.tbSending.Text = "";
-            this.tbBytes.Text = _bytes[0].Count.ToString();
+        }
+
+        /// <summary>
+        /// 送信データ（End Code 付き）を DataGrid と Byte 数に反映
+        /// </summary>
+        private void SendViewRefresh()
+        {
+            var sendBytes = BuildSendBytes();
+            _rows = FillByteGrid(this.dataGrid1, sendBytes);
+            this.tbBytes.Text = sendBytes.Length.ToString();
+        }
+
+        /// <summary>
+        /// 選択中の End Code
+        /// </summary>
+        private byte[] GetEndCode()
+        {
+            if (rbEndCrLf.IsChecked == true) return new byte[] { 0x0D, 0x0A };
+            if (rbEndCr.IsChecked == true) return new byte[] { 0x0D };
+            return new byte[0];
+        }
+
+        /// <summary>
+        /// 実際に送信するバイト列（入力データ + End Code）
+        /// </summary>
+        private byte[] BuildSendBytes()
+        {
+            return _bytes[0].Concat(GetEndCode()).ToArray();
+        }
+
+        private void EndCode_Checked(object sender, RoutedEventArgs e)
+        {
+            // InitializeComponent 中（IsChecked="True" の初期化）は表示対象がまだない
+            if (_bytes == null) return;
+            SendViewRefresh();
         }
 
         /// <summary>
@@ -372,9 +406,9 @@ namespace SerialCom
 
             Task<UInt32> storeAsyncTask;
 
-            if (_bytes[0].Count != 0)
+            var sendBytes = BuildSendBytes();
+            if (sendBytes.Length != 0)
             {
-                var sendBytes = _bytes[0].ToArray();
                 DataWriteObject.WriteBytes(sendBytes);
 
                 // Don't start any IO if we canceled the task

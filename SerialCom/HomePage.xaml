@@ -70,9 +70,9 @@
                         <Rectangle Width="30"/>
                         <StackPanel Orientation="Horizontal" BorderBrush="Pink" BorderThickness="2" Padding="5,0">
                             <TextBlock Text="End Code" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <RadioButton GroupName="EndCode" Content="Non" MinWidth="0" Margin="0,0,12,0" IsChecked="True"/>
-                            <RadioButton GroupName="EndCode" Content="CR LF" MinWidth="0" Margin="0,0,12,0"/>
-                            <RadioButton GroupName="EndCode" Content="CR" MinWidth="0"/>
+                            <RadioButton x:Name="rbEndNon" GroupName="EndCode" Content="Non" MinWidth="0" Margin="0,0,12,0" IsChecked="True" Checked="EndCode_Checked"/>
+                            <RadioButton x:Name="rbEndCrLf" GroupName="EndCode" Content="CR LF" MinWidth="0" Margin="0,0,12,0" Checked="EndCode_Checked"/>
+                            <RadioButton x:Name="rbEndCr" GroupName="EndCode" Content="CR" MinWidth="0" Checked="EndCode_Checked"/>
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
